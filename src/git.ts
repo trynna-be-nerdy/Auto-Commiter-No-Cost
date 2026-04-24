@@ -4,9 +4,11 @@ const CHARS_PER_TOKEN = 4;
 
 export class GitService {
   private git: SimpleGit;
+  private dryRun: boolean;
 
-  constructor(repoPath: string) {
+  constructor(repoPath: string, dryRun = false) {
     this.git = simpleGit(repoPath);
+    this.dryRun = dryRun;
   }
 
   async hasUnresolvedConflicts(): Promise<boolean> {
@@ -16,6 +18,10 @@ export class GitService {
   }
 
   async stageAll(): Promise<void> {
+    if (this.dryRun) {
+      console.log('[dry-run] Would run: git add -A');
+      return;
+    }
     console.log('[auto-commit] Staging all changes...');
     await this.git.add('-A');
   }
@@ -39,20 +45,26 @@ export class GitService {
   }
 
   async commit(message: string): Promise<void> {
+    if (this.dryRun) {
+      console.log(`[dry-run] Would run: git commit -m "${message}"`);
+      return;
+    }
     console.log(`[auto-commit] Committing: "${message}"`);
     await this.git.commit(message);
   }
 
   async push(remote: string, branch: string): Promise<boolean> {
+    if (this.dryRun) {
+      console.log(`[dry-run] Would run: git push ${remote} ${branch}`);
+      return true;
+    }
     try {
       console.log(`[auto-commit] Pushing to ${remote}/${branch}...`);
       await this.git.push(remote, branch);
       console.log('[auto-commit] Push succeeded.');
       return true;
     } catch (err) {
-      console.error(
-        `[auto-commit] Push failed (commit is saved locally): ${err}`
-      );
+      console.error(`[auto-commit] Push failed (commit is saved locally): ${err}`);
       return false;
     }
   }
