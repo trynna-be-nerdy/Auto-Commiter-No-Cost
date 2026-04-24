@@ -7,6 +7,10 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "pm2:start": "npm run build && pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop auto-commit",
+    "pm2:restart": "pm2 restart auto-commit",
+    "pm2:logs": "pm2 logs auto-commit",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
