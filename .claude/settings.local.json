@@ -10,7 +10,8 @@
       "Bash(npm run *)",
       "Skill(claude-api)",
       "Skill(claude-api:*)",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "Bash(task-master update-task *)"
     ]
   }
 }
