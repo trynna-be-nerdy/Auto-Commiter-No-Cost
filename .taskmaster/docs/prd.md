@@ -1,17 +1,17 @@
-# Product Requirements Document: Claude-Powered Auto-Commit System
+# Product Requirements Document: Auto-Commit System
 
 ## Overview
 
-A local background service that watches a Git repository for file changes, automatically stages changed files, generates an intelligent commit message using the Claude API, commits, and pushes/syncs to GitHub — with zero manual intervention.
+A local background service that watches a Git repository for file changes, automatically stages changed files, generates a conventional commit message using rule-based diff analysis, commits, and pushes to GitHub — with zero manual intervention and zero API costs.
 
 ---
 
 ## Goals
 
 - Eliminate manual `git add / commit / push` toil for personal or solo projects.
-- Produce meaningful, AI-generated commit messages that describe *what changed and why* (inferred from the diff).
+- Produce meaningful, structured commit messages derived entirely from the diff — no external API, no cost, no latency.
 - Run silently in the background with minimal resource usage.
-- Be configurable so the user can tune watch paths, debounce timing, push behavior, and Claude model.
+- Be configurable so the user can tune watch paths, debounce timing, and push behavior.
 
 ---
 
@@ -20,6 +20,7 @@ A local background service that watches a Git repository for file changes, autom
 - Multi-user or team collaboration workflows (no PR creation, no branch management beyond push).
 - Support for non-Git version control systems.
 - A GUI or web dashboard (CLI + config file is sufficient for v1).
+- AI-generated commit messages (deliberately out of scope — rule-based is free and instant).
 
 ---
 
@@ -30,35 +31,39 @@ A local background service that watches a Git repository for file changes, autom
 **What it does:** Monitors the repository working tree for any create, modify, rename, or delete events.
 
 **Requirements:**
-- Use a cross-platform file-watching library (e.g., `chokidar` for Node.js or `watchdog` for Python).
-- Respect `.gitignore` and a user-supplied ignore list so `node_modules/`, build artifacts, etc. are excluded.
-- Implement a configurable debounce window (default: 10 seconds) so rapid successive saves are batched into one commit rather than creating noise.
+- Use `chokidar` for cross-platform file watching.
+- Respect a user-supplied ignore list so `node_modules/`, `dist/`, `.git/`, logs, etc. are excluded.
+- Implement a configurable debounce window (default: 10 seconds) so rapid successive saves are batched into one commit.
 - Emit a "batch ready" event after the debounce window closes with no further changes.
 
 ### 2. Git Staging & Diff Extraction
 
-**What it does:** Stages changed files and captures the diff to feed into Claude.
+**What it does:** Stages changed files and captures the diff for analysis.
 
 **Requirements:**
-- Run `git add -A` (or a scoped variant) after the debounce window fires.
+- Run `git add -A` after the debounce window fires.
 - Run `git diff --cached` to produce the staged diff text.
 - If the diff is empty (nothing actually changed in Git's view), skip the commit cycle silently.
-- Limit diff size sent to Claude — truncate or summarize files larger than a configurable threshold (default: 4 000 tokens) to stay within context limits.
 
-### 3. Claude Commit Message Generator
+### 3. Rule-Based Commit Message Generator
 
-**What it does:** Sends the diff to the Claude API and returns a structured commit message.
+**What it does:** Parses the staged diff and produces a conventional commit message with zero external dependencies.
 
 **Requirements:**
-- Use the Anthropic Node.js / Python SDK.
-- Default model: `claude-haiku-4-5-20251001` (fast, cheap for small diffs); fall back to `claude-sonnet-4-6` for large diffs.
-- System prompt instructs Claude to:
-  - Output **only** a conventional-commits-style message: one subject line (≤72 chars) + optional body.
-  - Infer the commit type (`feat`, `fix`, `chore`, `refactor`, `docs`, `style`, `test`) from the diff.
-  - Never hallucinate file names; derive everything from the provided diff.
-- Implement prompt caching on the system prompt to reduce token costs on repeat calls.
-- Retry once on transient API errors (5xx, timeout) before falling back to a timestamped default message (`chore: auto-commit <ISO timestamp>`).
-- Surface the generated message to the console before committing so the user can see what was produced.
+- Parse `diff --git` headers to extract file paths and change status (added / modified / deleted / renamed).
+- Detect commit type using ordered heuristics:
+  1. All test files → `test`
+  2. All docs/markdown → `docs`
+  3. All style files → `style`
+  4. All config/tooling files → `chore`
+  5. Any new source file → `feat`
+  6. Diff contains fix/bug/error/patch keywords → `fix`
+  7. Fallback → `chore`
+- Scope = longest common parent directory of changed files.
+- Description = `add X`, `update Y`, `remove Z` (max 3 file names, then `+N more`).
+- Subject line truncated to 72 characters.
+- Output format: `<type>(<scope>): <description>`
+- No external API calls, no network, no cost.
 
 ### 4. Git Commit & Push
 
@@ -68,7 +73,7 @@ A local background service that watches a Git repository for file changes, autom
 - Run `git commit -m "<generated message>"`.
 - After a successful commit, run `git push` to the configured remote and branch.
 - If push fails (e.g., upstream diverged), log the error and leave the commit local — do not force-push.
-- Configurable option to disable auto-push and only auto-commit (push manually).
+- Configurable option to disable auto-push and only auto-commit.
 
 ### 5. Configuration File
 
@@ -80,17 +85,11 @@ A local background service that watches a Git repository for file changes, autom
 ```json
 {
   "watchPaths": ["."],
-  "ignorePatterns": ["node_modules", "dist", ".git", "*.log"],
+  "ignorePatterns": ["node_modules", "dist", ".git", "*.log", ".auto-commit.log"],
   "debounceSeconds": 10,
   "autoPush": true,
   "remoteName": "origin",
-  "branch": "main",
-  "claude": {
-    "defaultModel": "claude-haiku-4-5-20251001",
-    "largeModel": "claude-sonnet-4-6",
-    "largeDiffThresholdTokens": 4000,
-    "maxRetries": 1
-  }
+  "branch": "main"
 }
 ```
 
@@ -100,9 +99,9 @@ A local background service that watches a Git repository for file changes, autom
 
 **Requirements:**
 - Ship a startup script (`start.sh` / `start.ps1`) that launches the process.
-- Support running as a background process via `pm2` (Node) or `systemd` / Windows Task Scheduler.
+- Support running as a background process via `pm2`.
 - Write structured JSON logs to `.auto-commit.log` (rotated at 5 MB).
-- Expose a `--dry-run` flag that prints what would be committed/pushed without executing Git commands — useful for testing.
+- Expose a `--dry-run` flag that prints what would be committed/pushed without executing Git commands.
 
 ---
 
@@ -113,8 +112,8 @@ A local background service that watches a Git repository for file changes, autom
 | Runtime | Node.js 20 LTS |
 | Language | TypeScript |
 | File watching | chokidar |
-| Git operations | simple-git (Node.js wrapper) |
-| Claude integration | @anthropic-ai/sdk |
+| Git operations | simple-git |
+| Commit message | Rule-based diff parser (no external dependency) |
 | Process management | pm2 |
 | Config validation | zod |
 
@@ -128,8 +127,8 @@ File saved
     → (window expires with no new changes)
       → git add -A
         → git diff --cached  (empty? → skip)
-          → Claude API (diff as user message)
-            → Commit message returned
+          → Rule-based parser analyses diff
+            → Commit message generated instantly
               → git commit -m "<message>"
                 → git push origin <branch>
                   → Log result
@@ -141,8 +140,9 @@ File saved
 
 | Variable | Purpose |
 |---|---|
-| `ANTHROPIC_API_KEY` | Required. Authenticates Claude API calls. |
 | `AUTO_COMMIT_CONFIG` | Optional. Override path to `.auto-commit.json`. |
+
+No API keys required.
 
 ---
 
@@ -150,20 +150,19 @@ File saved
 
 | Scenario | Behavior |
 |---|---|
-| Claude API unavailable | Fall back to timestamped default message; still commit + push. |
 | Push rejected (non-fast-forward) | Log warning; commit remains local. Do not force-push. |
 | Repo has uncommitted merge conflict | Skip cycle; log "merge conflict detected, skipping". |
 | Watcher process crashes | pm2 restarts it automatically. |
 | `.auto-commit.json` missing | Use built-in defaults; warn on startup. |
-| Diff exceeds token limit | Truncate to threshold; note truncation in Claude prompt. |
+| Batch triggered while previous still processing | Skip; log "already in progress". |
 
 ---
 
 ## Security Considerations
 
-- `.auto-commit.json` is git-ignored to prevent committing API keys or custom ignore rules.
-- `ANTHROPIC_API_KEY` is read from the environment, never hard-coded.
-- The diff sent to Claude may contain source code; users should be aware their code is transmitted to Anthropic's API.
+- `.auto-commit.json` is git-ignored.
+- No API keys or secrets required — the system is entirely local.
+- No source code is transmitted to any external service.
 
 ---
 
@@ -172,7 +171,7 @@ File saved
 - Watcher starts and detects changes within 1 second of a file save.
 - Commit message is generated and commit completes within 15 seconds of the debounce window closing.
 - Zero manual `git commit` commands required during a normal coding session.
-- Claude API cost per commit < $0.001 on average (Haiku model).
+- Zero API cost per commit.
 
 ---
 
@@ -183,3 +182,4 @@ File saved
 - GUI tray icon / desktop notifications.
 - Support for monorepos with per-package commits.
 - Commit signing (GPG).
+- Optional AI-enhanced messages via Ollama (local LLM).
