@@ -2,13 +2,6 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { z } from 'zod';
 
-const ClaudeConfigSchema = z.object({
-  defaultModel: z.string().default('claude-haiku-4-5-20251001'),
-  largeModel: z.string().default('claude-sonnet-4-6'),
-  largeDiffThresholdTokens: z.number().default(4000),
-  maxRetries: z.number().int().min(0).default(1),
-});
-
 const ConfigSchema = z.object({
   watchPaths: z.array(z.string()).default(['.']),
   ignorePatterns: z
@@ -18,12 +11,6 @@ const ConfigSchema = z.object({
   autoPush: z.boolean().default(true),
   remoteName: z.string().default('origin'),
   branch: z.string().default('main'),
-  claude: ClaudeConfigSchema.default({
-    defaultModel: 'claude-haiku-4-5-20251001',
-    largeModel: 'claude-sonnet-4-6',
-    largeDiffThresholdTokens: 4000,
-    maxRetries: 1,
-  }),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

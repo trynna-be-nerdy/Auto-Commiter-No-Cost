@@ -22,7 +22,6 @@
   },
   "homepage": "https://github.com/trynna-be-nerdy/git-auto-commit#readme",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.91.0",
     "@types/node": "^25.6.0",
     "chokidar": "^5.0.0",
     "dotenv": "^17.4.2",

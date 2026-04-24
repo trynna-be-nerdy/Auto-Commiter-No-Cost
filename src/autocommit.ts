@@ -1,13 +1,12 @@
 import { loadConfig, type Config } from './config.js';
 import { FileWatcher } from './watcher.js';
 import { GitService } from './git.js';
-import { ClaudeService } from './claude.js';
+import { generateCommitMessage } from './commit-message.js';
 
 export class AutoCommitService {
   private config!: Config;
   private watcher: FileWatcher = new FileWatcher();
   private git!: GitService;
-  private claude!: ClaudeService;
   private isProcessing = false;
   private repoRoot: string;
 
@@ -18,7 +17,6 @@ export class AutoCommitService {
   async start(): Promise<void> {
     this.config = loadConfig(this.repoRoot);
     this.git = new GitService(this.repoRoot);
-    this.claude = new ClaudeService(this.config.claude);
 
     console.log(
       `[auto-commit] Service started. Watching: ${this.config.watchPaths.join(', ')} ` +
@@ -55,15 +53,13 @@ export class AutoCommitService {
 
       await this.git.stageAll();
 
-      const diff = await this.git.getStagedDiff(this.config.claude.largeDiffThresholdTokens);
+      const diff = await this.git.getStagedDiff(100_000);
       if (!diff) {
         console.log('[auto-commit] Nothing staged after git add — skipping.');
         return;
       }
 
-      console.log(`[auto-commit] Diff preview: ${diff.slice(0, 200).replace(/\n/g, ' ')}...`);
-
-      const message = await this.claude.generateCommitMessage(diff);
+      const message = generateCommitMessage(diff);
       console.log(`[auto-commit] Commit message: "${message}"`);
 
       await this.git.commit(message);
