@@ -38,7 +38,7 @@ npm install
 npm run build
 
 # 4. Copy the example config into your project root
-cp .auto-commit.json.example .auto-commit.json
+cp auto-commit.example.json .auto-commit.json
 ```
 
 ---
