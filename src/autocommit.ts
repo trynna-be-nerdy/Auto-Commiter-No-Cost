@@ -9,14 +9,16 @@ export class AutoCommitService {
   private git!: GitService;
   private isProcessing = false;
   private repoRoot: string;
+  private dryRun: boolean;
 
-  constructor(repoRoot: string = process.cwd()) {
+  constructor(repoRoot: string = process.cwd(), dryRun = false) {
     this.repoRoot = repoRoot;
+    this.dryRun = dryRun;
   }
 
   async start(): Promise<void> {
     this.config = loadConfig(this.repoRoot);
-    this.git = new GitService(this.repoRoot);
+    this.git = new GitService(this.repoRoot, this.dryRun);
 
     console.log(
       `[auto-commit] Service started. Watching: ${this.config.watchPaths.join(', ')} ` +
