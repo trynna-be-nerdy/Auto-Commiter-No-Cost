@@ -1,9 +1,9 @@
-import chokidar from 'chokidar';
+import chokidar, { type FSWatcher } from 'chokidar';
 import { resolve } from 'path';
 import type { Config } from './config.js';
 
 export class FileWatcher {
-  private watcher: chokidar.FSWatcher | null = null;
+  private watcher: FSWatcher | null = null;
   private debounceTimer: NodeJS.Timeout | null = null;
   private changeBuffer: Set<string> = new Set();
 
@@ -38,7 +38,7 @@ export class FileWatcher {
       .on('add', handleEvent)
       .on('change', handleEvent)
       .on('unlink', handleEvent)
-      .on('error', (err) => console.error(`[auto-commit] Watcher error: ${err}`));
+      .on('error', (err: unknown) => console.error(`[auto-commit] Watcher error: ${err}`));
 
     console.log(
       `[auto-commit] Watching ${watchPaths.join(', ')} (debounce: ${config.debounceSeconds}s)`
