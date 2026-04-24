@@ -24,6 +24,10 @@ node_modules/
 # OS specific
 .DS_Store
 
+dist/
+.auto-commit.json
+.auto-commit.log
+
 # Task files
 # tasks.json
 # tasks/ 

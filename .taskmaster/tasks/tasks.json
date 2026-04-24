@@ -1,0 +1,147 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": "1",
+        "title": "Project initialization and TypeScript setup",
+        "description": "Initialize Node.js project with TypeScript, configure build tooling, and set up the required directory structure",
+        "details": "1. Run `npm init -y` to create package.json\n2. Install core dependencies: `npm install typescript @types/node tsconfig-paths`\n3. Install dev dependencies: `npm install -D @types/node tsx nodemon`\n4. Create tsconfig.json with:\n   - target: ES2022\n   - module: NodeNext\n   - moduleResolution: NodeNext\n   - outDir: ./dist\n   - rootDir: ./src\n   - strict: true\n5. Add build scripts to package.json:\n   - \"build\": \"tsc\"\n   - \"dev\": \"tsx watch src/index.ts\"\n   - \"start\": \"node dist/index.js\"\n6. Create src/ directory for source files\n7. Create .auto-commit.json.example with default configuration schema\n8. Add node_modules/, dist/, .auto-commit.json, .auto-commit.log to .gitignore (already exists)",
+        "testStrategy": "Verify TypeScript compilation succeeds with `npm run build`. Ensure tsconfig.json has correct module settings for Node.js 20 LTS. Validate directory structure is created correctly.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "in-progress",
+        "subtasks": [],
+        "updatedAt": "2026-04-23T22:52:50.774Z"
+      },
+      {
+        "id": "2",
+        "title": "Install and configure core dependencies",
+        "description": "Install all required npm packages: chokidar for file watching, simple-git for Git operations, @anthropic-ai/sdk for Claude API, zod for config validation, and pm2 for process management",
+        "details": "1. Install runtime dependencies:\n   ```bash\n   npm install chokidar simple-git @anthropic-ai/sdk zod dotenv\n   ```\n2. Install pm2 globally or as dev dependency:\n   ```bash\n   npm install -D pm2\n   ```\n3. Install type definitions:\n   ```bash\n   npm install -D @types/node\n   ```\n4. Verify package.json includes all required dependencies with correct versions:\n   - chokidar: ^4.0.0 (latest stable)\n   - simple-git: ^3.25.0\n   - @anthropic-ai/sdk: ^0.32.0 (latest)\n   - zod: ^3.23.0\n   - dotenv: ^16.4.0\n5. Create .env.example with ANTHROPIC_API_KEY placeholder\n6. Document dependency choices in comments",
+        "testStrategy": "Run `npm install` and verify no errors. Check that all packages are installed in node_modules. Verify type definitions are available for TypeScript compilation.",
+        "priority": "high",
+        "dependencies": [
+          "1"
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": "3",
+        "title": "Create configuration schema and loader",
+        "description": "Implement Zod schema for .auto-commit.json validation and create config loader with defaults",
+        "details": "1. Create src/config.ts\n2. Define Zod schema matching PRD specification:\n   ```typescript\n   const ConfigSchema = z.object({\n     watchPaths: z.array(z.string()).default(['.']),\n     ignorePatterns: z.array(z.string()).default(['node_modules', 'dist', '.git', '*.log']),\n     debounceSeconds: z.number().default(10),\n     autoPush: z.boolean().default(true),\n     remoteName: z.string().default('origin'),\n     branch: z.string().default('main'),\n     claude: z.object({\n       defaultModel: z.string().default('claude-haiku-4-5-20251001'),\n       largeModel: z.string().default('claude-sonnet-4-6'),\n       largeDiffThresholdTokens: z.number().default(4000),\n       maxRetries: z.number().default(1)\n     })\n   });\n   ```\n3. Implement loadConfig() function:\n   - Check for .auto-commit.json in repo root\n   - Support AUTO_COMMIT_CONFIG env var override\n   - Parse and validate with Zod\n   - Return merged config (file + defaults)\n   - Log warning if file missing, use all defaults\n4. Export Config type and loadConfig function",
+        "testStrategy": "Unit test loadConfig() with valid config file, invalid config (should throw), and missing config (should use defaults). Verify Zod validation catches malformed JSON and invalid field types.",
+        "priority": "high",
+        "dependencies": [
+          "2"
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": "4",
+        "title": "Implement file watcher with debounce",
+        "description": "Create file watching service using chokidar that monitors repository changes and emits batch-ready events after debounce window",
+        "details": "1. Create src/watcher.ts\n2. Implement FileWatcher class:\n   ```typescript\n   class FileWatcher {\n     private watcher: chokidar.FSWatcher | null = null;\n     private debounceTimer: NodeJS.Timeout | null = null;\n     private changeBuffer: Set<string> = new Set();\n     \n     start(config: Config, onBatchReady: () => void): void\n     stop(): void\n     private handleChange(path: string): void\n     private resetDebounce(callback: () => void): void\n   }\n   ```\n3. Configure chokidar with:\n   - ignored: config.ignorePatterns (convert to anymatch patterns)\n   - ignoreInitial: true (don't trigger on startup)\n   - awaitWriteFinish: { stabilityThreshold: 300 } (wait for file write completion)\n4. Listen to 'add', 'change', 'unlink' events\n5. On each event:\n   - Add file path to changeBuffer\n   - Clear existing debounce timer\n   - Set new timer for config.debounceSeconds\n6. When timer expires:\n   - Clear changeBuffer\n   - Call onBatchReady callback\n7. Respect .gitignore by checking if path is in Git (simple-git can help)\n8. Add structured logging for each detected change",
+        "testStrategy": "Integration test: create test files, verify events fire. Test debounce by rapid file changes - should batch into single event. Verify .gitignore patterns are respected. Test stop() cleans up properly.",
+        "priority": "high",
+        "dependencies": [
+          "3"
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": "5",
+        "title": "Build Git operations module",
+        "description": "Implement Git staging, diff extraction, commit, and push operations using simple-git",
+        "details": "1. Create src/git.ts\n2. Implement GitService class:\n   ```typescript\n   class GitService {\n     private git: SimpleGit;\n     \n     constructor(repoPath: string)\n     async stageAll(): Promise<void>\n     async getStagedDiff(): Promise<string | null>\n     async commit(message: string): Promise<void>\n     async push(remote: string, branch: string): Promise<boolean>\n     async hasUnresolvedConflicts(): Promise<boolean>\n   }\n   ```\n3. stageAll(): Run `git add -A`\n4. getStagedDiff():\n   - Run `git diff --cached`\n   - Return null if empty (nothing staged)\n   - Truncate large diffs to config.claude.largeDiffThresholdTokens\n   - Estimate tokens: ~4 chars = 1 token\n   - If truncated, append \"[... diff truncated, exceeded token limit ...]\" note\n5. commit(): Run `git commit -m \"<message>\"`\n6. push():\n   - Run `git push <remote> <branch>`\n   - Return true on success\n   - Return false on error (log the error, don't throw)\n   - Never force push\n7. hasUnresolvedConflicts():\n   - Check `git status --porcelain` for 'UU', 'AA', 'DD' markers\n   - Return true if found\n8. Add error handling for all Git commands\n9. Log each Git operation with structured JSON logs",
+        "testStrategy": "Integration test with real Git repo: stage files, verify diff output, commit and check log, test push (can use test remote). Test conflict detection by creating merge conflict. Verify large diffs are truncated correctly.",
+        "priority": "high",
+        "dependencies": [
+          "3"
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": "6",
+        "title": "Implement Claude API integration for commit message generation",
+        "description": "Create service that sends staged diff to Claude API and returns conventional commit message with prompt caching and retry logic",
+        "details": "1. Create src/claude.ts\n2. Implement ClaudeService class:\n   ```typescript\n   class ClaudeService {\n     private client: Anthropic;\n     private config: Config['claude'];\n     \n     constructor(apiKey: string, config: Config['claude'])\n     async generateCommitMessage(diff: string): Promise<string>\n     private selectModel(diffLength: number): string\n     private buildPrompt(diff: string): { system: string, user: string }\n   }\n   ```\n3. Initialize Anthropic client with ANTHROPIC_API_KEY from env\n4. System prompt (enable prompt caching with cache_control):\n   ```\n   You are a Git commit message generator. Generate ONLY a conventional commit message.\n   Rules:\n   - Format: <type>: <subject> (max 72 chars)\n   - Optional body after blank line\n   - Types: feat, fix, chore, refactor, docs, style, test\n   - Infer type and description from the diff\n   - Never hallucinate file names\n   - Be concise and specific\n   Output ONLY the commit message, nothing else.\n   ```\n5. User message: \"Generate a commit message for this diff:\\n\\n{diff}\"\n6. selectModel():\n   - If diff tokens < largeDiffThresholdTokens: use defaultModel\n   - Else: use largeModel\n7. API call with:\n   - model: selected model\n   - max_tokens: 300\n   - system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }]\n   - messages: [{ role: 'user', content: userMessage }]\n8. Implement retry logic:\n   - On 5xx or timeout: retry once (maxRetries=1)\n   - On failure after retry: return fallback message \"chore: auto-commit <ISO timestamp>\"\n9. Parse response and return message.content[0].text\n10. Log API usage (tokens, model, cached status)",
+        "testStrategy": "Unit test with mock Anthropic client. Integration test with real API: pass sample diff, verify commit message format. Test retry logic by simulating 500 error. Test fallback when API unavailable. Verify prompt caching headers are sent.",
+        "priority": "high",
+        "dependencies": [
+          "3"
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": "7",
+        "title": "Build main orchestration loop",
+        "description": "Create main service that coordinates file watcher, Git operations, Claude API, and handles the complete auto-commit cycle",
+        "details": "1. Create src/autocommit.ts\n2. Implement AutoCommitService class:\n   ```typescript\n   class AutoCommitService {\n     private config: Config;\n     private watcher: FileWatcher;\n     private git: GitService;\n     private claude: ClaudeService;\n     private isProcessing: boolean = false;\n     \n     async start(): Promise<void>\n     stop(): void\n     private async processBatch(): Promise<void>\n   }\n   ```\n3. start():\n   - Load config via loadConfig()\n   - Initialize GitService, ClaudeService\n   - Start FileWatcher with processBatch as callback\n   - Log \"Auto-commit service started, watching <paths>\"\n4. processBatch() workflow:\n   - Set isProcessing=true to prevent concurrent runs\n   - Check for unresolved conflicts → skip if true\n   - Call git.stageAll()\n   - Get staged diff\n   - If diff is null/empty → skip silently\n   - Log diff preview (first 200 chars)\n   - Call claude.generateCommitMessage(diff)\n   - Log generated message to console\n   - Call git.commit(message)\n   - If config.autoPush: call git.push()\n   - If push fails: log warning, leave commit local\n   - Set isProcessing=false\n5. Add try-catch around entire processBatch:\n   - Log errors with structured JSON\n   - Always set isProcessing=false in finally block\n6. stop(): cleanup watcher, log shutdown",
+        "testStrategy": "Integration test end-to-end: modify file, wait for debounce, verify commit created, verify push attempted. Test with autoPush=false. Test conflict detection skip. Test concurrent batch prevention (isProcessing flag).",
+        "priority": "high",
+        "dependencies": [
+          "4",
+          "5",
+          "6"
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": "8",
+        "title": "Create CLI entry point with dry-run mode",
+        "description": "Build main entry point (index.ts) that loads environment variables, handles CLI flags, and starts the service",
+        "details": "1. Create src/index.ts\n2. Import dotenv and load .env: `dotenv.config()`\n3. Parse CLI arguments:\n   - --dry-run: enable dry-run mode (print actions without executing Git commands)\n   - --help: show usage\n4. Validate ANTHROPIC_API_KEY exists:\n   - If missing: log error and exit(1)\n5. If --dry-run:\n   - Pass flag to AutoCommitService\n   - Modify GitService to mock commit/push (log instead)\n6. Create AutoCommitService instance and call start()\n7. Handle SIGINT/SIGTERM for graceful shutdown:\n   ```typescript\n   process.on('SIGINT', () => {\n     console.log('Shutting down...');\n     service.stop();\n     process.exit(0);\n   });\n   ```\n8. Add startup banner with config summary\n9. Export for programmatic use if needed",
+        "testStrategy": "Manual test: run `npm run dev`, modify file, verify commit created. Test --dry-run flag: verify no actual commits. Test missing API key → should exit with error. Test SIGINT shutdown → should cleanup gracefully.",
+        "priority": "medium",
+        "dependencies": [
+          "7"
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": "9",
+        "title": "Implement structured logging system",
+        "description": "Create JSON-based logging utility with file rotation and console output",
+        "details": "1. Create src/logger.ts\n2. Implement Logger class:\n   ```typescript\n   class Logger {\n     private logFile: string = '.auto-commit.log';\n     private maxSize: number = 5 * 1024 * 1024; // 5MB\n     \n     info(message: string, meta?: object): void\n     warn(message: string, meta?: object): void\n     error(message: string, meta?: object): void\n     private write(level: string, message: string, meta?: object): void\n     private rotate(): void\n   }\n   ```\n3. Log format:\n   ```json\n   {\"timestamp\":\"2024-01-15T10:30:00.000Z\",\"level\":\"info\",\"message\":\"...\",\"meta\":{...}}\n   ```\n4. write() method:\n   - Format log as JSON\n   - Append to .auto-commit.log\n   - Also output to console (formatted for readability)\n5. rotate():\n   - Check file size before each write\n   - If > maxSize: rename to .auto-commit.log.1, create new file\n   - Keep only 1 backup (overwrite older)\n6. Create singleton instance: `export const logger = new Logger()`\n7. Replace all console.log calls in other modules with logger.info/warn/error",
+        "testStrategy": "Unit test log formatting. Integration test: write 6MB of logs, verify rotation creates .log.1 backup. Test all log levels. Verify JSON is valid and parseable.",
+        "priority": "medium",
+        "dependencies": [
+          "1"
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": "10",
+        "title": "Create process management scripts and documentation",
+        "description": "Set up pm2 configuration, startup scripts for Windows/Linux, and comprehensive README with usage instructions",
+        "details": "1. Create ecosystem.config.js for pm2:\n   ```javascript\n   module.exports = {\n     apps: [{\n       name: 'auto-commit',\n       script: './dist/index.js',\n       instances: 1,\n       autorestart: true,\n       watch: false,\n       max_memory_restart: '200M',\n       env: {\n         NODE_ENV: 'production'\n       }\n     }]\n   };\n   ```\n2. Create start.sh (Linux/macOS):\n   ```bash\n   #!/bin/bash\n   npm run build\n   pm2 start ecosystem.config.js\n   pm2 save\n   ```\n3. Create start.ps1 (Windows PowerShell):\n   ```powershell\n   npm run build\n   pm2 start ecosystem.config.js\n   pm2 save\n   ```\n4. Add npm scripts to package.json:\n   - \"pm2:start\": \"pm2 start ecosystem.config.js\"\n   - \"pm2:stop\": \"pm2 stop auto-commit\"\n   - \"pm2:logs\": \"pm2 logs auto-commit\"\n   - \"pm2:restart\": \"pm2 restart auto-commit\"\n5. Create comprehensive README.md:\n   - Overview and features\n   - Installation steps\n   - Configuration guide (.auto-commit.json reference)\n   - Usage: start, stop, logs, dry-run\n   - Environment variables (ANTHROPIC_API_KEY)\n   - Troubleshooting common issues\n   - Security considerations\n   - Example workflows\n6. Create .auto-commit.json.example with all fields documented\n7. Add setup instructions for systemd (Linux) and Task Scheduler (Windows) as alternative to pm2",
+        "testStrategy": "Manual test pm2 lifecycle: start service via pm2, verify it restarts on crash (kill process), check logs via pm2 logs, stop service. Test startup scripts on target platforms. Verify README instructions are complete and accurate by following them in fresh environment.",
+        "priority": "medium",
+        "dependencies": [
+          "8",
+          "9"
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "version": "1.0.0",
+      "lastModified": "2026-04-23T22:52:50.776Z",
+      "taskCount": 10,
+      "completedCount": 0,
+      "tags": [
+        "master"
+      ]
+    }
+  }
+}

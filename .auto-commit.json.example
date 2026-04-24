@@ -1,0 +1,14 @@
+{
+  "watchPaths": ["."],
+  "ignorePatterns": ["node_modules", "dist", ".git", "*.log", ".auto-commit.log"],
+  "debounceSeconds": 10,
+  "autoPush": true,
+  "remoteName": "origin",
+  "branch": "main",
+  "claude": {
+    "defaultModel": "claude-haiku-4-5-20251001",
+    "largeModel": "claude-sonnet-4-6",
+    "largeDiffThresholdTokens": 4000,
+    "maxRetries": 1
+  }
+}
