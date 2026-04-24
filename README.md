@@ -1,4 +1,4 @@
-# git-auto-commit
+# git-auto-commit-NO COST
 
 A zero-cost local background service that watches your repository for file changes, automatically stages them, generates a conventional commit message by analysing the diff, commits, and pushes to GitHub — with no manual intervention and no API keys required.
 
