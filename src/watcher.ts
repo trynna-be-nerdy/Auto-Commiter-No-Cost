@@ -1,5 +1,6 @@
 import chokidar, { type FSWatcher } from 'chokidar';
 import { resolve } from 'path';
+import { logger } from './logger.js';
 import type { Config } from './config.js';
 
 export class FileWatcher {
@@ -13,8 +14,7 @@ export class FileWatcher {
     }
 
     const watchPaths = config.watchPaths.map((p) => resolve(repoRoot, p));
-
-    const ignored = buildIgnoredPatterns(config.ignorePatterns, repoRoot);
+    const ignored = buildIgnoredPatterns(config.ignorePatterns);
 
     this.watcher = chokidar.watch(watchPaths, {
       ignored,
@@ -26,7 +26,7 @@ export class FileWatcher {
 
     const handleEvent = (filePath: string) => {
       this.changeBuffer.add(filePath);
-      console.log(`[auto-commit] Change detected: ${filePath}`);
+      logger.info(`Change detected: ${filePath}`);
       this.resetDebounce(config.debounceSeconds, () => {
         const paths = [...this.changeBuffer];
         this.changeBuffer.clear();
@@ -38,10 +38,10 @@ export class FileWatcher {
       .on('add', handleEvent)
       .on('change', handleEvent)
       .on('unlink', handleEvent)
-      .on('error', (err: unknown) => console.error(`[auto-commit] Watcher error: ${err}`));
+      .on('error', (err: unknown) => logger.error(`Watcher error: ${err}`));
 
-    console.log(
-      `[auto-commit] Watching ${watchPaths.join(', ')} (debounce: ${config.debounceSeconds}s)`
+    logger.info(
+      `Watching ${watchPaths.join(', ')} (debounce: ${config.debounceSeconds}s)`
     );
   }
 
@@ -55,7 +55,7 @@ export class FileWatcher {
       this.watcher.close();
       this.watcher = null;
     }
-    console.log('[auto-commit] Watcher stopped.');
+    logger.info('Watcher stopped.');
   }
 
   private resetDebounce(debounceSeconds: number, callback: () => void): void {
@@ -69,15 +69,12 @@ export class FileWatcher {
   }
 }
 
-function buildIgnoredPatterns(patterns: string[], repoRoot: string): (string | RegExp)[] {
+function buildIgnoredPatterns(patterns: string[]): (string | RegExp)[] {
   return patterns.map((pattern) => {
-    // Glob patterns with wildcards stay as-is; plain names get anchored to repo root
     if (pattern.includes('*') || pattern.includes('/')) {
       return pattern;
     }
-    return new RegExp(
-      `(^|[\\\\/])${escapeRegExp(pattern)}([\\\\/]|$)`
-    );
+    return new RegExp(`(^|[\\\\/])${escapeRegExp(pattern)}([\\\\/]|$)`);
   });
 }
 
