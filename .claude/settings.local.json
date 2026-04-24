@@ -11,7 +11,8 @@
       "Skill(claude-api)",
       "Skill(claude-api:*)",
       "Bash(npm uninstall *)",
-      "Bash(task-master update-task *)"
+      "Bash(task-master update-task *)",
+      "Bash(node dist/index.js --help)"
     ]
   }
 }
