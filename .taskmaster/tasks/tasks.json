@@ -138,13 +138,14 @@
           "8",
           "9"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "in-progress",
+        "subtasks": [],
+        "updatedAt": "2026-04-24T05:37:46.652Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-24T05:37:24.716Z",
+      "lastModified": "2026-04-24T05:37:46.654Z",
       "taskCount": 10,
       "completedCount": 8,
       "tags": [
