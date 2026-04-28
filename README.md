@@ -77,22 +77,50 @@ git-auto-commit/
 
 ## Installation
 
+### Standalone (own repo)
+
 ```bash
-# 1. Clone this repo
 git clone https://github.com/trynna-be-nerdy/git-auto-commit.git
 cd git-auto-commit
-
-# 2. Install dependencies
 npm install
-
-# 3. Build the TypeScript source
 npm run build
-
-# 4. Copy the example config and edit as needed
 cp auto-commit.json .auto-commit.json
+npm start
 ```
 
-> **Watching a different repo?** Set `watchPaths` in `.auto-commit.json` to the absolute path(s) of the directory you want to monitor, or run the service from inside that repo.
+### Inside an existing project (recommended)
+
+Clone git-auto-commit as a subdirectory of the project you want to watch:
+
+```bash
+cd my-project                          # your existing git repo
+git clone https://github.com/trynna-be-nerdy/git-auto-commit.git
+cd git-auto-commit
+npm install
+npm run build
+cp auto-commit.json ../.auto-commit.json   # config goes in the project root
+```
+
+Then start the service from inside the `git-auto-commit` folder:
+
+```bash
+npm start
+```
+
+The service automatically detects it is running inside a subdirectory, walks up to the repo root (`my-project/`), and watches the entire project from there. The `git-auto-commit/` folder itself is silently excluded from watching so it never commits its own files.
+
+You will see this on startup:
+
+```
+[auto-commit] Detected subdirectory install — watching repo root: /path/to/my-project
+[auto-commit] Auto-ignoring install directory: git-auto-commit
+```
+
+You can also add `git-auto-commit/` to your project's `.gitignore` if you don't want it tracked:
+
+```bash
+echo "git-auto-commit/" >> ../.gitignore
+```
 
 ---
 
