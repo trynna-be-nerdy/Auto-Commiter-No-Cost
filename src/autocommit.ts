@@ -11,15 +11,24 @@ export class AutoCommitService {
   private isProcessing = false;
   private repoRoot: string;
   private dryRun: boolean;
+  private installSubdir: string | null;
 
-  constructor(repoRoot: string = process.cwd(), dryRun = false) {
+  constructor(repoRoot: string = process.cwd(), dryRun = false, installSubdir: string | null = null) {
     this.repoRoot = repoRoot;
     this.dryRun = dryRun;
+    this.installSubdir = installSubdir;
   }
 
   async start(): Promise<void> {
     this.config = loadConfig(this.repoRoot);
     this.git = new GitService(this.repoRoot, this.dryRun);
+
+    // When installed as a subdirectory of another repo, automatically ignore
+    // the git-auto-commit folder itself so the tool doesn't watch its own files.
+    if (this.installSubdir && !this.config.ignorePatterns.includes(this.installSubdir)) {
+      this.config.ignorePatterns.push(this.installSubdir);
+      logger.info(`Auto-ignoring install directory: ${this.installSubdir}`);
+    }
 
     logger.info(
       `Service started — watching: ${this.config.watchPaths.join(', ')} | ` +
