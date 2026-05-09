@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'auto-commit-vtb',
       script: 'C:\\Users\\sriva\\VtB\\git-auto-commit\\dist\\index.js',
-      cwd: 'C:\\Users\\sriva\\VtB\\Gemma',
+      cwd: 'C:\\Users\\sriva\\vtb',
       instances: 1,
       autorestart: true,
       watch: false,
